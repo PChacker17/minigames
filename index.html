@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Gaming Hub</title>
+    <title>Minigames hub</title>
     <style>
+        
         /* Dark Theme & Layout */
         body {
             background-color: #0f1014;
@@ -70,6 +71,13 @@
             font-size: 40px;
         }
 
+        .thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 12px 12px 0 0;
+        }
+
         .game-info {
             padding: 10px;
             text-align: center;
@@ -85,31 +93,33 @@
 <body>
 
     <nav>
-        <div class="logo">My Games Hub</div>
+        <div class="logo">Minigames Hub</div>
         <div>Search | Categories</div>
     </nav>
 
     <div class="container">
-        <h2>New & Trending</h2>
+        <h2>Games</h2>
         
-        <div class="game-grid">
-            <div class="game-card">
-                <div class="thumbnail">🕸️</div>
-                <div class="game-info">Swing Hero</div>
-            </div>
+        <a href="2048.html" style="text-decoration: none; color: inherit;">
+            <div class="game-grid">
+                <div class="game-card">
+                    <div class="thumbnail"><img src="https://upload.wikimedia.org/wikipedia/commons/1/1a/2048_Icon.png" alt="2048"></div>
+                    <div class="game-info">2048</div>
+                </div>
+            </a>
 
             <div class="game-card">
-                <div class="thumbnail">⚔️</div>
+                <div class="thumbnail"><img src="https://via.placeholder.com/200x150/7b2cbf/ffffff?text=Stickman+Combat" alt="Stickman Combat"></div>
                 <div class="game-info">Stickman Combat</div>
             </div>
 
             <div class="game-card">
-                <div class="thumbnail">🤖</div>
+                <div class="thumbnail"><img src="https://via.placeholder.com/200x150/7b2cbf/ffffff?text=AI+Sandbox" alt="AI Sandbox"></div>
                 <div class="game-info">AI Sandbox</div>
             </div>
 
             <div class="game-card">
-                <div class="thumbnail">🏙️</div>
+                <div class="thumbnail"><img src="https://via.placeholder.com/200x150/7b2cbf/ffffff?text=City+Builder" alt="City Builder"></div>
                 <div class="game-info">City Builder</div>
             </div>
         </div>
