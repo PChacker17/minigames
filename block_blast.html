@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minigames hub - Block Blast
+
+    </title>
+    <style>
+        body { background-color: #050505; color: #fff; font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; }
+        
+        nav { background: #111; padding: 10px 20px; display: flex; justify-content: space-between; border-bottom: 1px solid #222; align-items: center; }
+        .logo { color: #a855f7; font-weight: 800; text-decoration: none; font-size: 18px; letter-spacing: 1px; }
+
+        /* Main Layout */
+        .page-content { display: flex; flex: 1; padding: 15px; gap: 15px; justify-content: center; background: radial-gradient(circle at top, #111 0%, #050505 100%); }
+
+        /* Slim Sidebars */
+        .sidebar { width: 70px; display: flex; flex-direction: column; gap: 10px; }
+        .mini-card { width: 100%; aspect-ratio: 1; background: #111; border-radius: 6px; border: 1px solid #222; cursor: pointer; transition: 0.2s; }
+        .mini-card:hover { border-color: #a855f7; transform: scale(1.05); }
+
+        /* THE GAME CENTER */
+        .game-wrapper { flex: 0 1 70%; max-width: 900px; display: flex; flex-direction: column; }
+
+        .game-frame-container { 
+            aspect-ratio: 16 / 9; /* Keeps it perfectly proportioned */
+            background: #000; 
+            border-radius: 12px 12px 0 0; /* Rounded top only */
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            overflow: hidden;
+        }
+
+        iframe { width: 100%; height: 100%; border: none; }
+
+        /* THE INFO BAR (Attached to the frame) */
+        .game-info-bar {
+            background: #111;
+            border-radius: 0 0 12px 12px; /* Rounded bottom only */
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            border: 1px solid #222;
+            border-top: none;
+        }
+
+        .info-left { display: flex; align-items: center; gap: 12px; }
+        .info-icon { width: 40px; height: 40px; border-radius: 8px; }
+        .info-text h3 { margin: 0; font-size: 16px; }
+        
+        .fs-btn { background: #222; color: #ccc; border: 1px solid #333; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; transition: 0.3s; }
+        .fs-btn:hover { background: #a855f7; color: white; border-color: #a855f7; }
+    </style>
+</head>
+<body>
+
+<nav>
+    <a href="index.html" class="logo">← HUB</a>
+    <div style="font-size: 14px; color: #666;">Playing: 2048</div>
+</nav>
+
+<div class="page-content">
+    <div class="sidebar">
+        <div class="mini-card"></div>
+        <div class="mini-card"></div>
+    </div>
+
+    <div class="game-wrapper">
+        <div class="game-frame-container">
+            <iframe src="block_blast_scource.html"></iframe>
+        </div>
+
+        <div class="game-info-bar">
+            <div class="info-left">
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTAH-GP279ml01-O7LI38lkksGHbrLXXteQgJYS9k4Ixw&s" class="info-icon">
+                <div class="info-text">
+                    <h3>Block Blast</h3>
+                </div>
+            </div>
+            <button class="fs-btn" onclick="goFullscreen()">⛶ Fullscreen</button>
+        </div>
+    </div>
+
+    <div class="sidebar">
+        <div class="mini-card"></div>
+        <div class="mini-card"></div>
+    </div>
+</div>
+
+<script>
+    function goFullscreen() {
+        let frame = document.querySelector('iframe');
+        if (frame.requestFullscreen) { frame.requestFullscreen(); }
+        else if (frame.webkitRequestFullscreen) { frame.webkitRequestFullscreen(); }
+    }
+</script>
+
+</body>
+</html>
