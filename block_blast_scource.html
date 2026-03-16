@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BLOCK BLAST</title>
+<link href="https://fonts.googleapis.com/css2?family=Boogaloo&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0e17;
+    --panel: #1a1828;
+    --grid-line: rgba(255,255,255,0.06);
+    --cell-empty: rgba(255,255,255,0.04);
+    --cell-size: 48px;
+    --gap: 3px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg);
+    font-family: 'Nunito', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  body::before {
+    content:'';
+    position:fixed; inset:0;
+    background: radial-gradient(ellipse at 20% 20%, rgba(255,107,107,0.08) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 80%, rgba(107,185,255,0.08) 0%, transparent 60%);
+    pointer-events:none; z-index:0;
+  }
+
+  #title {
+    font-family: 'Boogaloo', cursive;
+    font-size: 2.8rem;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, #ff6b6b 0%, #ffe66d 50%, #6bcbff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 12px;
+    filter: drop-shadow(0 0 20px rgba(255,107,107,0.5));
+    animation: titlePulse 3s ease-in-out infinite;
+    position: relative; z-index:1;
+  }
+  @keyframes titlePulse {
+    0%,100%{ filter: drop-shadow(0 0 18px rgba(255,107,107,0.4)); }
+    50%{ filter: drop-shadow(0 0 38px rgba(255,230,109,0.7)); }
+  }
+
+  #score-row {
+    display: flex; gap: 18px; margin-bottom: 14px;
+    position: relative; z-index:1;
+  }
+  .score-box {
+    background: var(--panel);
+    border: 1.5px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 8px 26px;
+    text-align: center;
+    min-width: 120px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+  }
+  .score-label {
+    font-size: 0.62rem;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 2px;
+  }
+  .score-val {
+    font-family: 'Boogaloo', cursive;
+    font-size: 2rem;
+    line-height: 1.1;
+  }
+  #score-box .score-val { color: #ffe66d; }
+  #hi-box .score-val   { color: #6bcbff; }
+
+  #game-wrap {
+    display: flex;
+    gap: 18px;
+    align-items: flex-start;
+    position: relative; z-index:1;
+  }
+
+  /* ── BOARD ── */
+  #board {
+    display: grid;
+    grid-template-columns: repeat(8, var(--cell-size));
+    grid-template-rows:    repeat(8, var(--cell-size));
+    gap: var(--gap);
+    background: var(--panel);
+    border-radius: 20px;
+    padding: 12px;
+    border: 1.5px solid rgba(255,255,255,0.09);
+    box-shadow: 0 10px 50px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.07);
+  }
+  .cell {
+    width: var(--cell-size);
+    height: var(--cell-size);
+    border-radius: 8px;
+    background: var(--cell-empty);
+    border: 1px solid var(--grid-line);
+    position: relative;
+    overflow: hidden;
+    transition: background 0.1s, box-shadow 0.1s;
+  }
+  .cell.filled {
+    border: none;
+    box-shadow: inset 0 3px 0 rgba(255,255,255,0.28), 0 3px 10px rgba(0,0,0,0.45);
+  }
+  .cell.filled::after {
+    content:'';
+    position:absolute;
+    top:4px; left:7px; right:7px;
+    height:6px;
+    border-radius:4px;
+    background: rgba(255,255,255,0.22);
+    pointer-events:none;
+  }
+  .cell.ghost {
+    border: none;
+    opacity: 0.38;
+    box-shadow: inset 0 2px 0 rgba(255,255,255,0.18);
+  }
+  .cell.ghost::after {
+    content:'';
+    position:absolute;
+    top:4px; left:7px; right:7px;
+    height:6px;
+    border-radius:4px;
+    background: rgba(255,255,255,0.14);
+    pointer-events:none;
+  }
+  .cell.valid-ghost {
+    /* confirmed placeable ghost */
+  }
+  .cell.invalid-ghost {
+    opacity: 0.15;
+    background: rgba(255,80,80,0.3) !important;
+  }
+  @keyframes clearFlash {
+    0%  { transform: scale(1.15); filter: brightness(2.8); }
+    40% { transform: scale(0.82); filter: brightness(1.2); }
+    100%{ transform: scale(1);    filter: brightness(1); background: var(--cell-empty) !important; box-shadow:none; border:1px solid var(--grid-line); }
+  }
+  .cell.clear-anim {
+    animation: clearFlash 0.52s ease forwards;
+  }
+
+  /* ── TRAY ── */
+  #tray {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    justify-content: center;
+  }
+  .piece-slot {
+    width: 130px; height: 130px;
+    background: var(--panel);
+    border-radius: 18px;
+    border: 1.5px solid rgba(255,255,255,0.09);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.45);
+    cursor: grab;
+    transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s;
+    position: relative;
+  }
+  .piece-slot.empty    { opacity: 0.3; cursor: default; }
+  .piece-slot.dragging { opacity: 0.25; transform: scale(0.94); }
+  .piece-slot:not(.empty):hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.55);
+  }
+  .piece-canvas {
+    display: grid;
+    gap: 3px;
+  }
+  .piece-cell {
+    width: 22px; height: 22px;
+    border-radius: 5px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: inset 0 2px 0 rgba(255,255,255,0.22), 0 2px 4px rgba(0,0,0,0.35);
+  }
+  .piece-cell::after {
+    content:'';
+    position:absolute;
+    top:2px; left:3px; right:3px;
+    height:3px;
+    border-radius:3px;
+    background: rgba(255,255,255,0.2);
+    pointer-events:none;
+  }
+
+  /* ── DRAG GHOST ── */
+  #drag-ghost {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    display: none;
+    gap: var(--gap);
+    opacity: 0.85;
+    filter: drop-shadow(0 8px 24px rgba(0,0,0,0.6));
+  }
+  #drag-ghost .piece-cell {
+    width: var(--cell-size);
+    height: var(--cell-size);
+    border-radius: 8px;
+    box-shadow: inset 0 3px 0 rgba(255,255,255,0.26), 0 3px 10px rgba(0,0,0,0.5);
+  }
+  #drag-ghost .piece-cell::after {
+    top:4px; left:6px; right:6px; height:6px; border-radius:5px;
+  }
+
+  /* ── EXCLAIM popup ── */
+  #exclaim {
+    position: fixed;
+    top: 28%;
+    left: 50%;
+    transform: translateX(-50%) scale(0);
+    font-family: 'Boogaloo', cursive;
+    font-size: 3.6rem;
+    text-shadow: 0 0 40px currentColor;
+    pointer-events: none;
+    z-index: 1000;
+    white-space: nowrap;
+    opacity: 0;
+  }
+  #exclaim.show {
+    animation: exclaimPop 1.25s cubic-bezier(.17,.67,.35,1.4) forwards;
+  }
+  @keyframes exclaimPop {
+    0%  { transform:translateX(-50%) scale(0) rotate(-10deg); opacity:1; }
+    18% { transform:translateX(-50%) scale(1.18) rotate(5deg); opacity:1; }
+    35% { transform:translateX(-50%) scale(0.94) rotate(-2deg); opacity:1; }
+    50% { transform:translateX(-50%) scale(1.06) rotate(1deg); opacity:1; }
+    65% { transform:translateX(-50%) scale(1) rotate(0deg); opacity:1; }
+    82% { transform:translateX(-50%) scale(1) rotate(0deg); opacity:1; }
+    100%{ transform:translateX(-50%) scale(1.08) rotate(0deg); opacity:0; }
+  }
+
+  /* ── COMBO ── */
+  #combo {
+    position: fixed;
+    top: 46%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Boogaloo', cursive;
+    font-size: 1.7rem;
+    background: linear-gradient(135deg, #ff6b6b, #ffe66d);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 999;
+    white-space: nowrap;
+  }
+  #combo.show {
+    animation: comboAnim 1s ease forwards;
+  }
+  @keyframes comboAnim {
+    0%  { opacity:0; transform:translateX(-50%) translateY(12px) scale(0.8); }
+    20% { opacity:1; transform:translateX(-50%) translateY(0) scale(1.05); }
+    80% { opacity:1; }
+    100%{ opacity:0; transform:translateX(-50%) translateY(-28px) scale(0.9); }
+  }
+
+  /* ── PARTICLES ── */
+  .particle {
+    position: fixed;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 500;
+    animation: particleFly 0.85s ease forwards;
+  }
+  @keyframes particleFly {
+    0%   { opacity:1; transform: scale(1.4); }
+    100% { opacity:0; transform: scale(0) translate(var(--dx), var(--dy)); }
+  }
+
+  /* ── SCORE POP ── */
+  .score-pop {
+    position: fixed;
+    font-family: 'Boogaloo', cursive;
+    font-size: 1.45rem;
+    color: #ffe66d;
+    text-shadow: 0 0 14px rgba(255,230,109,0.7);
+    pointer-events: none;
+    z-index: 600;
+    animation: scorePop 1.1s ease forwards;
+    white-space: nowrap;
+  }
+  @keyframes scorePop {
+    0%  { opacity:1; transform: translateY(0) scale(1); }
+    100%{ opacity:0; transform: translateY(-80px) scale(0.75); }
+  }
+
+  /* ── GAME OVER ── */
+  #gameover-screen {
+    display: none;
+    position: fixed; inset:0;
+    background: rgba(15,14,23,0.93);
+    backdrop-filter: blur(8px);
+    z-index: 2000;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+  }
+  #gameover-screen.show { display:flex; }
+  #go-title {
+    font-family: 'Boogaloo', cursive;
+    font-size: 4.2rem;
+    color: #ff6b6b;
+    text-shadow: 0 0 50px rgba(255,107,107,0.8);
+    animation: goShake 0.55s ease;
+  }
+  @keyframes goShake {
+    0%,100%{transform:rotate(0);}
+    20%{transform:rotate(-6deg);}
+    40%{transform:rotate(6deg);}
+    60%{transform:rotate(-3deg);}
+    80%{transform:rotate(3deg);}
+  }
+  #go-score {
+    font-family:'Boogaloo',cursive;
+    font-size:2.2rem;
+    color:#ffe66d;
+  }
+  #go-hi {
+    font-size:1rem;
+    color:rgba(255,255,255,0.45);
+    letter-spacing:1px;
+  }
+  #restart-btn {
+    margin-top: 8px;
+    padding: 14px 52px;
+    border-radius: 44px;
+    border: none;
+    background: linear-gradient(135deg, #ff6b6b, #ff9f43);
+    font-family: 'Boogaloo', cursive;
+    font-size: 1.7rem;
+    color: #fff;
+    cursor: pointer;
+    letter-spacing: 2px;
+    box-shadow: 0 6px 32px rgba(255,107,107,0.55);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  #restart-btn:hover {
+    transform: scale(1.08);
+    box-shadow: 0 12px 44px rgba(255,107,107,0.75);
+  }
+</style>
+</head>
+<body>
+
+<div id="title">Block Blast</div>
+
+<div id="score-row">
+  <div class="score-box" id="score-box">
+    <div class="score-label">Score</div>
+    <div class="score-val" id="score-val">0</div>
+  </div>
+  <div class="score-box" id="hi-box">
+    <div class="score-label">Best</div>
+    <div class="score-val" id="hi-val">0</div>
+  </div>
+</div>
+
+<div id="game-wrap">
+  <div id="tray">
+    <div class="piece-slot" id="slot0"></div>
+    <div class="piece-slot" id="slot1"></div>
+    <div class="piece-slot" id="slot2"></div>
+  </div>
+  <div id="board"></div>
+</div>
+
+<div id="drag-ghost"></div>
+<div id="exclaim"></div>
+<div id="combo"></div>
+
+<div id="gameover-screen">
+  <div id="go-title">GAME OVER</div>
+  <div id="go-score">Score: 0</div>
+  <div id="go-hi">Best: 0</div>
+  <button id="restart-btn">PLAY AGAIN</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+//  CONFIG
+// ═══════════════════════════════════════
+const ROWS = 8, COLS = 8;
+const CELL  = 48, GAP = 3;      // px
+
+const COLORS = [
+  '#ff6b6b','#ff9f43','#ffe66d','#6bcbff',
+  '#a29bfe','#55efc4','#fd79a8','#74b9ff',
+  '#00cec9','#e17055','#b2bec3','#6ab04c',
+];
+
+const SHAPES = [
+  [[1]],
+  [[1,1]],[[1],[1]],
+  [[1,1,1]],[[1],[1],[1]],
+  [[1,1,1,1]],[[1],[1],[1],[1]],
+  [[1,1,1,1,1]],[[1],[1],[1],[1],[1]],
+  [[1,1],[1,1]],
+  [[1,1,1],[1,1,1],[1,1,1]],
+  [[1,0],[1,0],[1,1]],[[0,1],[0,1],[1,1]],
+  [[1,1],[1,0],[1,0]],[[1,1],[0,1],[0,1]],
+  [[1,1,1],[0,1,0]],[[0,1,0],[1,1,1]],
+  [[1,0],[1,1],[1,0]],[[0,1],[1,1],[0,1]],
+  [[0,1,1],[1,1,0]],[[1,1,0],[0,1,1]],
+  [[1,0],[1,1],[0,1]],[[0,1],[1,1],[1,0]],
+  [[1,1],[1,1],[1,1]],[[1,1,1],[1,1,1]],
+  [[1,0,0],[1,0,0],[1,1,1]],[[0,0,1],[0,0,1],[1,1,1]],
+  [[1,1,1],[1,0,0],[1,0,0]],[[1,1,1],[0,0,1],[0,0,1]],
+  [[0,1,0],[1,1,1],[0,1,0]],
+  [[1,1],[1,0]],[[1,1],[0,1]],[[1,0],[1,1]],[[0,1],[1,1]],
+  [[1,1,0],[0,1,0],[0,1,1]],
+  [[1,0,1],[1,1,1],[1,0,1]],
+  [[1,1,1],[1,0,1],[1,1,1]],
+];
+
+const EXCLAIMS = [
+  { text:'✨ AMAZING!',        color:'#ffe66d' },
+  { text:'🔥 ON FIRE!',        color:'#ff6b6b' },
+  { text:'💥 BLAST!',          color:'#ff9f43' },
+  { text:'⚡ ELECTRIC!',       color:'#6bcbff' },
+  { text:'🌟 UNBELIEVABLE!',   color:'#a29bfe' },
+  { text:'💎 BRILLIANT!',      color:'#55efc4' },
+  { text:'🚀 SUPERB!',         color:'#fd79a8' },
+  { text:'👑 LEGENDARY!',      color:'#ffe66d' },
+  { text:'🎯 PERFECT!',        color:'#ff6b6b' },
+  { text:'🌈 SPECTACULAR!',    color:'#74b9ff' },
+  { text:'🤩 INSANE!',         color:'#e17055' },
+  { text:'💫 PHENOMENAL!',     color:'#00cec9' },
+  { text:'🎉 GREAT JOB!',      color:'#ffe66d' },
+  { text:'⭐ STELLAR!',        color:'#a29bfe' },
+  { text:'🔮 MAGICAL!',        color:'#6bcbff' },
+  { text:'💪 CRUSHING IT!',    color:'#ff9f43' },
+  { text:'🏆 CHAMPION!',       color:'#ffe66d' },
+  { text:'🌊 WAVE CLEAR!',     color:'#6bcbff' },
+  { text:'🎆 GORGEOUS!',       color:'#fd79a8' },
+  { text:'🥇 INCREDIBLE!',     color:'#ffe66d' },
+  { text:'🌠 OUT OF THIS WORLD!', color:'#a29bfe' },
+];
+
+const COMBO_MSGS = ['DOUBLE!!','TRIPLE!!!','QUAD!!!!','PENTA!!!!!','HEXA!!!!!!','ULTRA COMBO!'];
+
+// ═══════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════
+let grid   = [];         // ROWS×COLS → null | colorIdx
+let pieces = [null,null,null];
+let score  = 0;
+let highscore = +( localStorage.getItem('bbHi') || 0 );
+let comboCount = 0;
+
+// Drag
+let drag = null;       // { slotIdx, piece }
+let ghostCells = [];   // [{r,c,ci}]
+
+// ═══════════════════════════════════════
+//  DOM refs
+// ═══════════════════════════════════════
+const boardEl       = document.getElementById('board');
+const slots         = [0,1,2].map(i => document.getElementById('slot'+i));
+const scoreValEl    = document.getElementById('score-val');
+const hiValEl       = document.getElementById('hi-val');
+const exclaimEl     = document.getElementById('exclaim');
+const comboEl       = document.getElementById('combo');
+const dragGhostEl   = document.getElementById('drag-ghost');
+const goScreen      = document.getElementById('gameover-screen');
+const goScoreEl     = document.getElementById('go-score');
+const goHiEl        = document.getElementById('go-hi');
+
+// ═══════════════════════════════════════
+//  BOARD BUILD
+// ═══════════════════════════════════════
+function initGrid() {
+  grid = Array.from({length:ROWS}, ()=>Array(COLS).fill(null));
+}
+
+function buildBoard() {
+  boardEl.innerHTML = '';
+  for (let r=0; r<ROWS; r++)
+    for (let c=0; c<COLS; c++) {
+      const d = document.createElement('div');
+      d.className = 'cell';
+      d.dataset.r = r; d.dataset.c = c;
+      boardEl.appendChild(d);
+    }
+}
+
+function cell(r,c){ return boardEl.querySelector(`[data-r="${r}"][data-c="${c}"]`); }
+
+function renderBoard() {
+  for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
+    const el = cell(r,c);
+    if (!el) continue;
+    const v = grid[r][c];
+    el.classList.remove('filled','ghost','valid-ghost','invalid-ghost','clear-anim');
+    if (v !== null) {
+      el.classList.add('filled');
+      el.style.background = COLORS[v];
+    } else {
+      el.style.background = '';
+    }
+  }
+  // overlay ghost
+  for (const {r,c,ci} of ghostCells) {
+    const el = cell(r,c);
+    if (!el) continue;
+    if (grid[r][c] !== null) {
+      el.classList.add('invalid-ghost');
+    } else {
+      el.classList.add('ghost','valid-ghost','filled');
+      el.style.background = COLORS[ci];
+    }
+  }
+}
+
+// ═══════════════════════════════════════
+//  TRAY
+// ═══════════════════════════════════════
+function mkPiece() {
+  return { shape: SHAPES[Math.floor(Math.random()*SHAPES.length)],
+           color: Math.floor(Math.random()*COLORS.length) };
+}
+
+function refillTray() {
+  if (pieces.some(p=>p!==null)) return;
+  pieces = [mkPiece(), mkPiece(), mkPiece()];
+  renderTray();
+}
+
+function renderTray() {
+  for (let i=0;i<3;i++) {
+    const slot = slots[i];
+    slot.innerHTML = '';
+    const p = pieces[i];
+    if (!p) { slot.classList.add('empty'); continue; }
+    slot.classList.remove('empty');
+
+    const R = p.shape.length, C = p.shape[0].length;
+    const canvas = document.createElement('div');
+    canvas.className = 'piece-canvas';
+    canvas.style.gridTemplateColumns = `repeat(${C},22px)`;
+    canvas.style.gridTemplateRows    = `repeat(${R},22px)`;
+    for (let r=0;r<R;r++) for (let c=0;c<C;c++) {
+      const cel = document.createElement('div');
+      cel.className = 'piece-cell';
+      if (p.shape[r][c]) {
+        cel.style.background = COLORS[p.color];
+      } else {
+        cel.style.visibility = 'hidden';
+        cel.style.background = 'transparent';
+        cel.style.boxShadow  = 'none';
+      }
+      canvas.appendChild(cel);
+    }
+    slot.appendChild(canvas);
+  }
+}
+
+// ═══════════════════════════════════════
+//  DRAG & DROP
+// ═══════════════════════════════════════
+function startDrag(idx, cx, cy) {
+  if (!pieces[idx]) return;
+  drag = { slotIdx:idx, piece:pieces[idx] };
+  slots[idx].classList.add('dragging');
+  buildDragGhostEl(drag.piece);
+  moveDragGhostEl(cx, cy);
+}
+
+function buildDragGhostEl(p) {
+  const R=p.shape.length, C=p.shape[0].length;
+  dragGhostEl.innerHTML = '';
+  dragGhostEl.style.display        = 'grid';
+  dragGhostEl.style.gridTemplateColumns = `repeat(${C},${CELL}px)`;
+  dragGhostEl.style.gridTemplateRows    = `repeat(${R},${CELL}px)`;
+  for (let r=0;r<R;r++) for (let c=0;c<C;c++) {
+    const cel = document.createElement('div');
+    cel.className = 'piece-cell';
+    cel.style.width = CELL+'px'; cel.style.height = CELL+'px';
+    cel.style.borderRadius = '8px';
+    if (p.shape[r][c]) {
+      cel.style.background = COLORS[p.color];
+    } else {
+      cel.style.visibility='hidden'; cel.style.background='transparent'; cel.style.boxShadow='none';
+    }
+    dragGhostEl.appendChild(cel);
+  }
+}
+
+// Shared offset: drag ghost floats centered on cursor, shifted up so it's above the finger
+const GHOST_OFFSET_Y = -80; // px above cursor
+
+function ghostTopLeft(cx, cy, piece) {
+  // Returns the screen position of the top-left corner of the drag ghost
+  const R = piece.shape.length, C = piece.shape[0].length;
+  const w = C * CELL + (C - 1) * GAP;
+  const h = R * CELL + (R - 1) * GAP;
+  return {
+    x: cx - w / 2,
+    y: cy - h / 2 + GHOST_OFFSET_Y,
+  };
+}
+
+function moveDragGhostEl(cx, cy) {
+  if (!drag) return;
+  const {x, y} = ghostTopLeft(cx, cy, drag.piece);
+  dragGhostEl.style.left = x + 'px';
+  dragGhostEl.style.top  = y + 'px';
+}
+
+function onMove(cx, cy) {
+  if (!drag) return;
+  moveDragGhostEl(cx, cy);
+  const pos = gridPos(cx, cy, drag.piece);
+  ghostCells = calcGhost(drag.piece, pos.r, pos.c);
+  renderBoard();
+}
+
+function onDrop(cx, cy) {
+  if (!drag) return;
+  const {slotIdx, piece} = drag;
+  const pos = gridPos(cx, cy, piece);
+
+  dragGhostEl.style.display = 'none';
+  slots[slotIdx].classList.remove('dragging');
+  drag = null;
+  ghostCells = [];
+
+  if (canPlace(piece, pos.r, pos.c)) {
+    place(piece, pos.r, pos.c, slotIdx);
+  } else {
+    renderBoard();
+    renderTray();
+  }
+}
+
+function gridPos(cx, cy, piece) {
+  // Use the exact same top-left the visual ghost uses, then convert to grid coords
+  const {x: gx, y: gy} = ghostTopLeft(cx, cy, piece);
+  const rect = boardEl.getBoundingClientRect();
+  const step = CELL + GAP;
+  const PADDING = 12;
+  // top-left of the piece relative to the board's inner area
+  const bx = gx - rect.left - PADDING;
+  const by = gy - rect.top  - PADDING;
+  const c = Math.round(bx / step);
+  const r = Math.round(by / step);
+  return {r, c};
+}
+
+function canPlace(piece, r, c) {
+  for (let pr=0; pr<piece.shape.length; pr++)
+    for (let pc=0; pc<piece.shape[0].length; pc++) {
+      if (!piece.shape[pr][pc]) continue;
+      const gr=r+pr, gc=c+pc;
+      if (gr<0||gr>=ROWS||gc<0||gc>=COLS||grid[gr][gc]!==null) return false;
+    }
+  return true;
+}
+
+function calcGhost(piece, r, c) {
+  const cells=[];
+  for (let pr=0;pr<piece.shape.length;pr++)
+    for (let pc=0;pc<piece.shape[0].length;pc++)
+      if (piece.shape[pr][pc]) cells.push({r:r+pr, c:c+pc, ci:piece.color});
+  return cells;
+}
+
+// Event listeners – mouse
+slots.forEach((s,i) => {
+  s.addEventListener('mousedown', e => { e.preventDefault(); startDrag(i,e.clientX,e.clientY); });
+  s.addEventListener('touchstart', e => { e.preventDefault(); startDrag(i,e.touches[0].clientX,e.touches[0].clientY); }, {passive:false});
+});
+document.addEventListener('mousemove', e => onMove(e.clientX,e.clientY));
+document.addEventListener('touchmove',  e => { if(drag){e.preventDefault(); onMove(e.touches[0].clientX,e.touches[0].clientY);} }, {passive:false});
+document.addEventListener('mouseup',   e => onDrop(e.clientX,e.clientY));
+document.addEventListener('touchend',  e => { if(drag) onDrop(e.changedTouches[0].clientX,e.changedTouches[0].clientY); });
+
+// ═══════════════════════════════════════
+//  SOUNDS
+// ═══════════════════════════════════════
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playPlace() {
+  const ctx = audioCtx;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(520, ctx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.07);
+  gain.gain.setValueAtTime(0.18, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.09);
+  osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.09);
+}
+
+function playClear() {
+  const ctx = audioCtx;
+  [0, 0.06, 0.12].forEach((delay, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime([660, 880, 1100][i], ctx.currentTime + delay);
+    gain.gain.setValueAtTime(0.14, ctx.currentTime + delay);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.18);
+    osc.start(ctx.currentTime + delay); osc.stop(ctx.currentTime + delay + 0.18);
+  });
+}
+
+// ═══════════════════════════════════════
+//  PLACEMENT
+// ═══════════════════════════════════════
+function place(piece, r, c, slotIdx) {
+  // Write to grid
+  for (let pr=0;pr<piece.shape.length;pr++)
+    for (let pc=0;pc<piece.shape[0].length;pc++)
+      if (piece.shape[pr][pc]) grid[r+pr][c+pc] = piece.color;
+
+  pieces[slotIdx] = null;
+  playPlace();
+  renderBoard();
+
+  const {rows:cRows, cols:cCols} = findClears();
+  const lines = cRows.length + cCols.length;
+
+  if (lines > 0) {
+    comboCount++;
+    playClear();
+    doAnimateClear(cRows, cCols, () => {
+      clearLines(cRows, cCols);
+      addScore(lines, cRows, cCols, r, c);
+      showExclaim(lines);
+      if (comboCount>1) showCombo(comboCount);
+      renderBoard();
+      renderTray();
+      refillTray();
+      checkGameOver();
+    });
+  } else {
+    comboCount = 0;
+    // small placement score
+    let pts=0;
+    for (let pr=0;pr<piece.shape.length;pr++) for (let pc=0;pc<piece.shape[0].length;pc++) if(piece.shape[pr][pc]) pts++;
+    score += pts;
+    updateScore();
+    renderTray();
+    refillTray();
+    checkGameOver();
+  }
+}
+
+function findClears() {
+  const rows=[], cols=[];
+  for (let r=0;r<ROWS;r++) if (grid[r].every(v=>v!==null)) rows.push(r);
+  for (let c=0;c<COLS;c++) if (grid.every(row=>row[c]!==null)) cols.push(c);
+  return {rows,cols};
+}
+
+function doAnimateClear(rows, cols, cb) {
+  const set = new Set();
+  rows.forEach(r=>{for(let c=0;c<COLS;c++) set.add(r+','+c);});
+  cols.forEach(c=>{for(let r=0;r<ROWS;r++) set.add(r+','+c);});
+  set.forEach(k=>{
+    const [r,c]=k.split(',').map(Number);
+    const el=cell(r,c);
+    if(el) { el.classList.remove('clear-anim'); void el.offsetWidth; el.classList.add('clear-anim'); }
+  });
+  spawnParticles(rows,cols);
+  setTimeout(cb, 520);
+}
+
+function clearLines(rows, cols) {
+  rows.forEach(r=>{for(let c=0;c<COLS;c++) grid[r][c]=null;});
+  cols.forEach(c=>{for(let r=0;r<ROWS;r++) grid[r][c]=null;});
+}
+
+function addScore(lines, rows, cols, pr, pc) {
+  const set=new Set();
+  rows.forEach(r=>{for(let c=0;c<COLS;c++) set.add(r+','+c);});
+  cols.forEach(c=>{for(let r=0;r<ROWS;r++) set.add(r+','+c);});
+  let pts = set.size * 10;
+  if (lines===2) pts+=60; else if(lines===3) pts+=180; else if(lines>=4) pts+=500;
+  pts = Math.round(pts * Math.max(1, comboCount*0.6+0.4));
+  score += pts;
+  updateScore();
+  showScorePop('+'+pts, pr, pc);
+}
+
+// ═══════════════════════════════════════
+//  UI UPDATES
+// ═══════════════════════════════════════
+function updateScore() {
+  scoreValEl.textContent = score;
+  if (score>highscore) { highscore=score; localStorage.setItem('bbHi',highscore); }
+  hiValEl.textContent = highscore;
+}
+
+function showScorePop(text, r, c) {
+  const rect = boardEl.getBoundingClientRect();
+  const x = rect.left+12 + c*(CELL+GAP)+CELL/2;
+  const y = rect.top +12 + r*(CELL+GAP);
+  const el=document.createElement('div');
+  el.className='score-pop'; el.textContent=text;
+  el.style.left=x+'px'; el.style.top=y+'px';
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(),1100);
+}
+
+function showExclaim(lines) {
+  let pool = EXCLAIMS;
+  if (lines>=4) pool = EXCLAIMS.filter(e=>['UNBELIEVABLE','LEGENDARY','INSANE','PHENOMENAL','SPECTACULAR','MAGICAL','STELLAR','OUT OF THIS WORLD','INCREDIBLE','CHAMPION'].some(w=>e.text.includes(w)));
+  else if (lines>=2) pool = EXCLAIMS.filter(e=>['AMAZING','BRILLIANT','ELECTRIC','SUPERB','PERFECT','CRUSHING IT','GORGEOUS','WAVE CLEAR'].some(w=>e.text.includes(w)));
+  const p = pool.length ? pool[Math.floor(Math.random()*pool.length)] : EXCLAIMS[Math.floor(Math.random()*EXCLAIMS.length)];
+  exclaimEl.className='';
+  exclaimEl.textContent=p.text;
+  exclaimEl.style.color=p.color;
+  exclaimEl.style.textShadow=`0 0 50px ${p.color}`;
+  void exclaimEl.offsetWidth;
+  exclaimEl.classList.add('show');
+}
+
+function showCombo(n) {
+  const msg = COMBO_MSGS[Math.min(n-2,COMBO_MSGS.length-1)]||'COMBO!';
+  comboEl.className='';
+  comboEl.textContent=`×${n} ${msg}`;
+  void comboEl.offsetWidth;
+  comboEl.classList.add('show');
+}
+
+function spawnParticles(rows, cols) {
+  const palette=[];
+  rows.forEach(r=>{for(let c=0;c<COLS;c++) if(grid[r][c]!==null) palette.push(COLORS[grid[r][c]]);});
+  cols.forEach(c=>{for(let r=0;r<ROWS;r++) if(grid[r][c]!==null) palette.push(COLORS[grid[r][c]]);});
+  const rect=boardEl.getBoundingClientRect();
+  for (let i=0;i<44;i++) {
+    const el=document.createElement('div');
+    el.className='particle';
+    const col=palette.length ? palette[Math.floor(Math.random()*palette.length)] : '#fff';
+    el.style.background=col; el.style.boxShadow=`0 0 9px ${col}`;
+    const x=rect.left+Math.random()*rect.width;
+    const y=rect.top +Math.random()*rect.height;
+    el.style.left=x+'px'; el.style.top=y+'px';
+    el.style.setProperty('--dx',(Math.random()-0.5)*220+'px');
+    el.style.setProperty('--dy',(Math.random()-0.5)*220-70+'px');
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(),900);
+  }
+}
+
+// ═══════════════════════════════════════
+//  GAME OVER
+// ═══════════════════════════════════════
+function checkGameOver() {
+  const avail = pieces.filter(p=>p!==null);
+  if (!avail.length) return; // tray will refill
+  const ok = avail.some(p=>{
+    for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++) if(canPlace(p,r,c)) return true;
+    return false;
+  });
+  if (!ok) setTimeout(()=>{
+    goScoreEl.textContent='Score: '+score;
+    goHiEl.textContent='Best: '+highscore;
+    goScreen.classList.add('show');
+  },650);
+}
+
+document.getElementById('restart-btn').addEventListener('click', startGame);
+
+// ═══════════════════════════════════════
+//  START
+// ═══════════════════════════════════════
+function startGame() {
+  score=0; comboCount=0;
+  pieces=[null,null,null];
+  initGrid();
+  buildBoard();
+  updateScore();
+  refillTray();
+  goScreen.classList.remove('show');
+}
+
+hiValEl.textContent = highscore;
+startGame();
+</script>
+</body>
+</html>
